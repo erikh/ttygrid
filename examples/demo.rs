@@ -20,10 +20,18 @@ fn randstring(len: u8) -> String {
 }
 
 fn main() -> Result<(), std::io::Error> {
-    let header_lineno = Rc::new(RefCell::new(GridHeader::default().set_text("line")));
-    let header_one = Rc::new(RefCell::new(GridHeader::default().set_text("one")));
-    let header_two = Rc::new(RefCell::new(GridHeader::default().set_text("two")));
-    let header_extra = Rc::new(RefCell::new(GridHeader::default().set_text("extra")));
+    let header_lineno = Rc::new(RefCell::new(
+        GridHeader::default().set_text("line").set_priority(10),
+    ));
+    let header_one = Rc::new(RefCell::new(
+        GridHeader::default().set_text("one").set_priority(5),
+    ));
+    let header_two = Rc::new(RefCell::new(
+        GridHeader::default().set_text("two").set_priority(5),
+    ));
+    let header_extra = Rc::new(RefCell::new(
+        GridHeader::default().set_text("extra").set_priority(20),
+    ));
     let header_extra2 = Rc::new(RefCell::new(GridHeader::default().set_text("extra2")));
     let header_extra3 = Rc::new(RefCell::new(
         GridHeader::default().set_text("extra3").set_priority(20),

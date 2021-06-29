@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{cell::RefCell, fmt, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 type SafeGridHeader = Rc<RefCell<GridHeader>>;
 type HeaderList = Vec<SafeGridHeader>;
@@ -145,15 +145,12 @@ impl TTYGrid {
 
         let mut prio_map: Vec<(usize, (HeaderList, usize))> = Vec::new();
         self.deselect_all_headers();
-        let mut priority = self.headers.clone();
-        priority.sort();
-        eprintln!("{:?}", priority);
 
-        let mut len = priority.len();
+        let mut len = self.headers.len();
 
         while len > 0 {
             let mut headers = HeaderList::new();
-            for header in priority.iter().take(len) {
+            for header in self.headers.iter().take(len) {
                 headers.push(header.clone())
             }
 
@@ -162,24 +159,33 @@ impl TTYGrid {
 
             while max_len > w {
                 let mut new_headers = headers.clone();
-                let mut lowest_prio_index = 0;
+                let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
                 let mut idx = new_headers.len();
 
                 for header in new_headers.iter().rev() {
+                    idx -= 1;
                     let priority = RefCell::borrow(header).priority;
-                    // we expect that the users will let stuff fall off to the right, so here we are optimizing for that WRT priority
+                    // we expect that the users will let stuff fall off to the right, so here we
+                    // are optimizing for that WRT priority
                     if priority < lowest_prio_index {
+                        eprintln!("priority: {}", priority);
                         to_remove = Some(idx);
                         lowest_prio_index = priority;
                     }
 
-                    idx -= 1;
+                    eprintln!("idx: {}", idx);
                 }
 
                 if to_remove.is_some() {
+                    eprintln!(
+                        "removing: {}, name: {}",
+                        to_remove.unwrap(),
+                        new_headers.get(to_remove.unwrap()).unwrap().borrow().text
+                    );
                     new_headers.remove(to_remove.unwrap());
-                    max_len = len_map.max_len_for_headers(new_headers);
+                    max_len = len_map.max_len_for_headers(new_headers.clone());
+                    headers = new_headers;
                 } else {
                     break;
                 }
@@ -201,7 +207,7 @@ impl TTYGrid {
         let mut max_headers: Option<HeaderList> = None;
         let mut last_len = 0;
 
-        for (_, (headers, max_len)) in prio_map.iter() {
+        for (_, (headers, max_len)) in prio_map.iter().rev() {
             if *max_len <= w && *max_len > last_len {
                 max_headers = Some(headers.clone());
                 last_len = *max_len;
