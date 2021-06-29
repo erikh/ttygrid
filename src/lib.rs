@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 type SafeGridHeader = Rc<RefCell<GridHeader>>;
@@ -174,12 +175,12 @@ impl TTYGrid {
         self.selected.0.clear()
     }
 
-    fn set_grid_max_len(&mut self, len_map: &LengthMapper) {
+    fn set_grid_max_len(&mut self, len_map: &LengthMapper) -> Result<(), anyhow::Error> {
         let mut cached_columns = Vec::new();
 
         let mut idx = 0;
         for header in self.headers.0.iter_mut() {
-            let max_len = len_map.max_len_for_column(&header.borrow());
+            let max_len = len_map.max_len_for_column(&header.borrow())?;
             header.borrow_mut().set_max_len(max_len);
             cached_columns.insert(idx, header.borrow().max_len);
             idx += 1;
@@ -194,14 +195,16 @@ impl TTYGrid {
                 idx += 1;
             }
         }
+
+        Ok(())
     }
 
-    fn determine_headers(&mut self) -> Result<(), std::io::Error> {
+    fn determine_headers(&mut self) -> Result<(), anyhow::Error> {
         let mut len_map = LengthMapper::default();
         len_map.map_lines(self.lines.clone());
 
-        self.set_grid_max_len(&len_map); // this has to happen before any return occurs
-        let last = len_map.max_len_for_headers(self.headers.clone());
+        self.set_grid_max_len(&len_map)?; // this has to happen before any return occurs
+        let last = len_map.max_len_for_headers(self.headers.clone())?;
 
         if last <= self.width {
             self.select_all_headers();
@@ -219,7 +222,7 @@ impl TTYGrid {
                 headers.0.push(header.clone())
             }
 
-            let mut max_len = len_map.max_len_for_headers(headers.clone());
+            let mut max_len = len_map.max_len_for_headers(headers.clone())?;
 
             while max_len > self.width {
                 let mut new_headers = headers.clone();
@@ -238,7 +241,7 @@ impl TTYGrid {
 
                 if to_remove.is_some() {
                     new_headers.0.remove(to_remove.unwrap());
-                    max_len = len_map.max_len_for_headers(new_headers.clone());
+                    max_len = len_map.max_len_for_headers(new_headers.clone())?;
                     headers = new_headers;
                 } else {
                     max_len = 0 // bury it
@@ -251,10 +254,7 @@ impl TTYGrid {
         }
 
         if prio_map.len() == 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "your terminal is too small",
-            ));
+            return Err(anyhow!("your terminal is too small"));
         }
 
         prio_map.sort_by(|(lprio, (_, llen)), (rprio, (_, rlen))| {
@@ -272,7 +272,7 @@ impl TTYGrid {
         Ok(())
     }
 
-    pub fn display(&mut self) -> Result<String, std::io::Error> {
+    pub fn display(&mut self) -> Result<String, anyhow::Error> {
         self.determine_headers()?;
         Ok(format!("{}", self))
     }
@@ -346,14 +346,15 @@ impl LengthMapper {
         }
     }
 
-    fn max_len_for_column(&self, header: &GridHeader) -> usize {
+    fn max_len_for_column(&self, header: &GridHeader) -> Result<usize, anyhow::Error> {
         let mut max_len = 0;
         for line in self.0.clone() {
             let found = line.iter().find(|i| i.0.borrow().eq(&header));
 
             if found.is_none() {
-                // FIXME make this Result<>
-                panic!("could not find pre-existing column header in line");
+                return Err(anyhow!(
+                    "panic: cannot find pre-existing column in line, report this bug"
+                ));
             }
 
             if max_len < found.unwrap().1 {
@@ -361,13 +362,14 @@ impl LengthMapper {
             }
         }
 
-        max_len + header.max_pad.unwrap_or(0) + 2
+        Ok(max_len + header.max_pad.unwrap_or(0) + 2)
     }
 
-    fn max_len_for_headers(&mut self, headers: HeaderList) -> usize {
-        headers
-            .0
-            .iter()
-            .fold(0, |x, h| x + self.max_len_for_column(&h.clone().borrow()))
+    fn max_len_for_headers(&mut self, headers: HeaderList) -> Result<usize, anyhow::Error> {
+        Ok(headers.0.iter().fold(0, |x, h| {
+            x + self
+                .max_len_for_column(&h.clone().borrow())
+                .unwrap_or_default()
+        }))
     }
 }
