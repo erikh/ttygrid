@@ -48,11 +48,26 @@ fn main() -> Result<(), std::io::Error> {
     for lineno in 0..10 {
         grid.add_line(GridLine(vec![
             GridItem::new(header_lineno.clone(), format!("{}", lineno)),
-            GridItem::new(header_one.clone(), format!("{}", randstring(30))),
-            GridItem::new(header_two.clone(), format!("{}", randstring(30))),
-            GridItem::new(header_extra.clone(), format!("{}", randstring(30))),
-            GridItem::new(header_extra2.clone(), format!("{}", randstring(30))),
-            GridItem::new(header_extra3.clone(), format!("{}", randstring(30))),
+            GridItem::new(
+                header_one.clone(),
+                format!("{}", randstring(rand::random::<u8>() % 30 + 10)),
+            ),
+            GridItem::new(
+                header_two.clone(),
+                format!("{}", randstring(rand::random::<u8>() % 30 + 10)),
+            ),
+            GridItem::new(
+                header_extra.clone(),
+                format!("{}", randstring(rand::random::<u8>() % 30 + 10)),
+            ),
+            GridItem::new(
+                header_extra2.clone(),
+                format!("{}", randstring(rand::random::<u8>() % 30 + 10)),
+            ),
+            GridItem::new(
+                header_extra3.clone(),
+                format!("{}", randstring(rand::random::<u8>() % 30 + 10)),
+            ),
         ]));
     }
     println!("{}", grid.display()?);

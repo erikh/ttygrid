@@ -3,7 +3,21 @@
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 type SafeGridHeader = Rc<RefCell<GridHeader>>;
-type HeaderList = Vec<SafeGridHeader>;
+
+#[derive(Clone)]
+pub struct HeaderList(Vec<SafeGridHeader>);
+
+impl Default for HeaderList {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl HeaderList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug, Ord)]
 pub struct GridHeader {
@@ -12,6 +26,7 @@ pub struct GridHeader {
     min_size: Option<usize>,
     max_pad: Option<usize>,
     priority: usize,
+    max_len: Option<usize>,
 }
 
 impl Default for GridHeader {
@@ -20,8 +35,9 @@ impl Default for GridHeader {
             index: None,
             text: "",
             min_size: None,
-            max_pad: None,
+            max_pad: Some(4),
             priority: 0,
+            max_len: None,
         }
     }
 }
@@ -40,9 +56,20 @@ impl PartialOrd for GridHeader {
     }
 }
 
-impl fmt::Display for GridHeader {
+impl fmt::Display for HeaderList {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} ", self.text)
+        for header in self.0.clone() {
+            write!(
+                formatter,
+                "{:<width$}",
+                header.borrow().text,
+                width = header
+                    .borrow()
+                    .max_len
+                    .unwrap_or(header.borrow().text.len() + 2)
+            )?
+        }
+        Ok(())
     }
 }
 
@@ -66,15 +93,35 @@ impl GridHeader {
 pub struct GridItem {
     header: SafeGridHeader,
     contents: String,
+    max_len: Option<usize>,
 }
 
 impl GridItem {
     pub fn new(header: SafeGridHeader, contents: String) -> Self {
-        Self { header, contents }
+        Self {
+            header,
+            contents,
+            max_len: None,
+        }
     }
 
     fn len(&self) -> usize {
         self.contents.len() + 1 // right padding
+    }
+
+    fn set_max_len(&mut self, max_len: usize) {
+        self.max_len = Some(max_len)
+    }
+}
+
+impl fmt::Display for GridItem {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "{:<max_len$}",
+            self.contents,
+            max_len = self.max_len.unwrap_or(self.len())
+        )
     }
 }
 
@@ -86,10 +133,10 @@ pub struct TTYGrid {
 }
 
 impl TTYGrid {
-    pub fn new(headers: HeaderList) -> Self {
+    pub fn new(headers: Vec<SafeGridHeader>) -> Self {
         Self {
-            selected: Vec::new(),
-            headers,
+            selected: HeaderList(headers.clone()),
+            headers: HeaderList(headers),
             lines: Vec::new(),
         }
     }
@@ -105,16 +152,16 @@ impl TTYGrid {
     pub fn select(&mut self, header: SafeGridHeader, idx: usize) {
         // update index (still an issue)
         RefCell::borrow_mut(&header).set_index(idx);
-        self.selected.push(header)
+        self.selected.0.push(header)
     }
 
     pub fn is_selected(&self, header: SafeGridHeader) -> bool {
-        self.selected.contains(&header)
+        self.selected.0.contains(&header)
     }
 
     pub fn select_all_headers(&mut self) {
         let mut idx = 0;
-        for header in self.headers.clone() {
+        for header in self.headers.0.clone() {
             let header = header.clone();
             self.select(header, idx);
             idx += 1;
@@ -122,7 +169,7 @@ impl TTYGrid {
     }
 
     pub fn deselect_all_headers(&mut self) {
-        self.selected.clear()
+        self.selected.0.clear()
     }
 
     fn determine_headers(&mut self) -> Result<(), std::io::Error> {
@@ -146,26 +193,45 @@ impl TTYGrid {
         let mut prio_map: Vec<(usize, (HeaderList, usize))> = Vec::new();
         self.deselect_all_headers();
 
-        let mut len = self.headers.len();
+        let mut cached_columns = Vec::new();
+
+        let mut idx = 0;
+        for header in self.headers.0.iter_mut() {
+            header.borrow_mut().max_len = Some(len_map.max_len_for_column(header.clone()));
+            cached_columns.insert(idx, header.borrow().max_len);
+            idx += 1;
+        }
+
+        for line in self.lines.iter_mut() {
+            let mut idx = 0;
+            for mut item in line.0.iter_mut() {
+                if cached_columns.get(idx).is_some() {
+                    item.max_len = *cached_columns.get(idx).clone().unwrap();
+                }
+                idx += 1;
+            }
+        }
+
+        let mut len = self.headers.0.len();
 
         while len > 0 {
             let mut headers = HeaderList::new();
-            for header in self.headers.iter().take(len) {
-                headers.push(header.clone())
+            for header in self.headers.0.iter().take(len) {
+                headers.0.push(header.clone())
             }
 
-            eprintln!("headers: {:?}, len: {}", headers, headers.len());
+            eprintln!("headers: {:?}, len: {}", headers.0, headers.0.len());
             let mut max_len = len_map.max_len_for_headers(headers.clone());
 
             while max_len > w {
                 let mut new_headers = headers.clone();
                 let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
-                let mut idx = new_headers.len();
+                let mut idx = new_headers.0.len();
 
-                for header in new_headers.iter().rev() {
+                for header in new_headers.0.iter().rev() {
                     idx -= 1;
-                    let priority = RefCell::borrow(header).priority;
+                    let priority = header.borrow().priority;
                     // we expect that the users will let stuff fall off to the right, so here we
                     // are optimizing for that WRT priority
                     if priority < lowest_prio_index {
@@ -181,9 +247,9 @@ impl TTYGrid {
                     eprintln!(
                         "removing: {}, name: {}",
                         to_remove.unwrap(),
-                        new_headers.get(to_remove.unwrap()).unwrap().borrow().text
+                        new_headers.0.get(to_remove.unwrap()).unwrap().borrow().text
                     );
-                    new_headers.remove(to_remove.unwrap());
+                    new_headers.0.remove(to_remove.unwrap());
                     max_len = len_map.max_len_for_headers(new_headers.clone());
                     headers = new_headers;
                 } else {
@@ -191,15 +257,12 @@ impl TTYGrid {
                 }
             }
 
-            let index = headers
-                .iter()
-                .fold(0, |acc, x| acc + RefCell::borrow(x).priority);
+            let index = headers.0.iter().fold(0, |acc, x| acc + x.borrow().priority);
             prio_map.push((index, (headers, max_len)));
 
             len -= 1;
         }
 
-        eprintln!("{:?}", prio_map);
         prio_map.sort_by(|(lprio, (_, llen)), (rprio, (_, rlen))| {
             lprio.cmp(&rprio).then(llen.cmp(rlen))
         });
@@ -222,7 +285,7 @@ impl TTYGrid {
         }
 
         let mut idx = 0;
-        for header in max_headers.unwrap() {
+        for header in max_headers.unwrap().0 {
             self.select(header, idx);
             idx += 1;
         }
@@ -230,6 +293,7 @@ impl TTYGrid {
         eprintln!(
             "selected {:?}",
             self.selected
+                .0
                 .iter()
                 .map(|h| RefCell::borrow(h).text)
                 .collect::<Vec<&str>>()
@@ -246,11 +310,7 @@ impl TTYGrid {
 
 impl fmt::Display for TTYGrid {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        for header in self.selected.clone() {
-            write!(formatter, "{}", RefCell::borrow(&header))?
-        }
-
-        writeln!(formatter)?;
+        writeln!(formatter, "{}", self.selected)?;
 
         for line in self.lines.clone() {
             writeln!(formatter, "{}", line.selected(self))?
@@ -265,7 +325,9 @@ pub struct GridLine(pub Vec<GridItem>);
 
 impl GridLine {
     fn len(&self) -> usize {
-        self.0.iter().fold(0, |acc, x| acc + x.len())
+        self.0
+            .iter()
+            .fold(0, |acc, x| acc + x.max_len.unwrap_or(x.len()))
     }
 
     fn selected(&self, grid: &TTYGrid) -> Self {
@@ -273,7 +335,6 @@ impl GridLine {
         for item in self.0.iter() {
             eprintln!("{} checked", RefCell::borrow(&item.header).text);
             if grid.is_selected(item.header.clone()) {
-                eprintln!("{} selected", RefCell::borrow(&item.header));
                 ret.push(item.clone())
             }
         }
@@ -291,7 +352,7 @@ impl Default for GridLine {
 impl fmt::Display for GridLine {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for contents in self.0.clone() {
-            write!(formatter, "{} ", contents.contents)?
+            write!(formatter, "{}", contents)?
         }
 
         Ok(())
@@ -330,6 +391,26 @@ impl LengthMapper {
         last
     }
 
+    fn max_len_for_column(&self, header: SafeGridHeader) -> usize {
+        let mut max_len = 0;
+        for line in self.0.clone() {
+            let found = line
+                .iter()
+                .find(|i| RefCell::borrow(&i.0).eq(&header.borrow()));
+
+            if found.is_none() {
+                // FIXME make this Result<>
+                panic!("could not find pre-existing column header in line");
+            }
+
+            if max_len < found.unwrap().1 {
+                max_len = found.unwrap().1
+            }
+        }
+
+        max_len + header.borrow().max_pad.unwrap_or(0) + 2
+    }
+
     fn max_len_for_headers(&mut self, headers: HeaderList) -> usize {
         self.0
             .iter()
@@ -337,7 +418,7 @@ impl LengthMapper {
                 line.iter()
                     .filter_map(|(header, len)| {
                         // wtf is my life anyway
-                        if headers.contains(header) {
+                        if headers.0.contains(header) {
                             Some((header, len))
                         } else {
                             None
