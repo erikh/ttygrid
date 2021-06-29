@@ -14,4 +14,4 @@ repository = "https://github.com/erikh/ttygrid"
 termion = ">=0"
 
 [dev-dependencies]
-rand = "*"
+rand = ">=0"
