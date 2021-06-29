@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 type SafeGridHeader = Rc<RefCell<GridHeader>>;
@@ -74,6 +72,10 @@ impl fmt::Display for HeaderList {
 }
 
 impl GridHeader {
+    pub fn set_max_len(&mut self, len: usize) {
+        self.max_len = Some(len)
+    }
+
     pub fn set_text(mut self, text: &'static str) -> Self {
         self.text = text;
         self
@@ -137,8 +139,9 @@ impl TTYGrid {
     pub fn new(headers: Vec<SafeGridHeader>) -> Self {
         let (w, _) = termion::terminal_size().unwrap_or((80, 25));
         let width = w as usize;
+
         Self {
-            selected: HeaderList(headers.clone()),
+            selected: HeaderList::new(),
             headers: HeaderList(headers),
             lines: Vec::new(),
             width,
@@ -164,12 +167,7 @@ impl TTYGrid {
     }
 
     pub fn select_all_headers(&mut self) {
-        let mut idx = 0;
-        for header in self.headers.0.clone() {
-            let header = header.clone();
-            self.select(header, idx);
-            idx += 1;
-        }
+        self.selected = self.headers.clone()
     }
 
     pub fn deselect_all_headers(&mut self) {
@@ -181,16 +179,17 @@ impl TTYGrid {
 
         let mut idx = 0;
         for header in self.headers.0.iter_mut() {
-            header.borrow_mut().max_len = Some(len_map.max_len_for_column(header.clone()));
+            let max_len = len_map.max_len_for_column(&header.borrow());
+            header.borrow_mut().set_max_len(max_len);
             cached_columns.insert(idx, header.borrow().max_len);
             idx += 1;
         }
 
         for line in self.lines.iter_mut() {
             let mut idx = 0;
-            for mut item in line.0.iter_mut() {
+            for item in line.0.iter_mut() {
                 if cached_columns.get(idx).is_some() {
-                    item.max_len = *cached_columns.get(idx).clone().unwrap();
+                    item.set_max_len(cached_columns.get(idx).clone().unwrap().unwrap());
                 }
                 idx += 1;
             }
@@ -199,11 +198,13 @@ impl TTYGrid {
 
     fn determine_headers(&mut self) -> Result<(), std::io::Error> {
         let mut len_map = LengthMapper::default();
-        let last = len_map.map_lines(self.lines.clone());
+        len_map.map_lines(self.lines.clone());
 
         self.set_grid_max_len(&len_map); // this has to happen before any return occurs
+        let last = len_map.max_len_for_headers(self.headers.clone());
 
         if last <= self.width {
+            eprintln!("selecting all: last: {}, width: {}", last, self.width);
             self.select_all_headers();
             return Ok(());
         }
@@ -303,12 +304,6 @@ impl fmt::Display for TTYGrid {
 pub struct GridLine(pub Vec<GridItem>);
 
 impl GridLine {
-    fn len(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |acc, x| acc + x.max_len.unwrap_or(x.len()))
-    }
-
     fn selected(&self, grid: &TTYGrid) -> Self {
         let mut ret = Vec::new();
         for item in self.0.iter() {
@@ -347,32 +342,23 @@ impl Default for LengthMapper {
 }
 
 impl LengthMapper {
-    fn map_lines(&mut self, lines: Vec<GridLine>) -> usize {
-        let mut last = 0;
+    fn map_lines(&mut self, lines: Vec<GridLine>) {
         for line in lines.clone() {
             let len = self.0.len();
-            let mut line_len = 0;
             self.0.push(Vec::new()); // now len is equal to index
             for item in line.0 {
                 self.0
                     .get_mut(len)
                     .unwrap()
                     .push((item.header.clone(), item.len()));
-                line_len += item.len();
-            }
-
-            if last < line_len {
-                last = line_len
             }
         }
-
-        last
     }
 
-    fn max_len_for_column(&self, header: SafeGridHeader) -> usize {
+    fn max_len_for_column(&self, header: &GridHeader) -> usize {
         let mut max_len = 0;
         for line in self.0.clone() {
-            let found = line.iter().find(|i| i.0.borrow().eq(&header.borrow()));
+            let found = line.iter().find(|i| i.0.borrow().eq(&header));
 
             if found.is_none() {
                 // FIXME make this Result<>
@@ -384,13 +370,13 @@ impl LengthMapper {
             }
         }
 
-        max_len + header.borrow().max_pad.unwrap_or(0) + 2
+        max_len + header.max_pad.unwrap_or(0) + 2
     }
 
     fn max_len_for_headers(&mut self, headers: HeaderList) -> usize {
         headers
             .0
             .iter()
-            .fold(0, |x, h| x + self.max_len_for_column(h.clone()))
+            .fold(0, |x, h| x + self.max_len_for_column(&h.clone().borrow()))
     }
 }
