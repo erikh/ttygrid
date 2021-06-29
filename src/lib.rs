@@ -204,7 +204,6 @@ impl TTYGrid {
         let last = len_map.max_len_for_headers(self.headers.clone());
 
         if last <= self.width {
-            eprintln!("selecting all: last: {}, width: {}", last, self.width);
             self.select_all_headers();
             return Ok(());
         }
@@ -221,7 +220,6 @@ impl TTYGrid {
             }
 
             let mut max_len = len_map.max_len_for_headers(headers.clone());
-            eprintln!("{}", max_len);
 
             while max_len > self.width {
                 let mut new_headers = headers.clone();
@@ -232,11 +230,6 @@ impl TTYGrid {
                 for header in new_headers.0.iter() {
                     let priority = header.borrow().priority;
                     if priority < lowest_prio_index {
-                        eprintln!(
-                            "marking for removal: {}, text: {}",
-                            idx,
-                            header.borrow().text
-                        );
                         to_remove = Some(idx);
                         lowest_prio_index = priority;
                     }
@@ -246,7 +239,6 @@ impl TTYGrid {
                 if to_remove.is_some() {
                     new_headers.0.remove(to_remove.unwrap());
                     max_len = len_map.max_len_for_headers(new_headers.clone());
-                    eprintln!("max len: {}", max_len);
                     headers = new_headers;
                 } else {
                     max_len = 0 // bury it
@@ -255,7 +247,6 @@ impl TTYGrid {
 
             let index = headers.0.iter().fold(0, |acc, x| acc + x.borrow().priority);
             prio_map.push((index, (headers, max_len)));
-            eprintln!("pushing to prio map: prio: {}, len: {}", index, max_len);
             len -= 1;
         }
 
