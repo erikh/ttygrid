@@ -130,14 +130,18 @@ pub struct TTYGrid {
     headers: HeaderList,
     selected: HeaderList,
     lines: Vec<GridLine>,
+    width: usize,
 }
 
 impl TTYGrid {
     pub fn new(headers: Vec<SafeGridHeader>) -> Self {
+        let (w, _) = termion::terminal_size().unwrap_or((80, 25));
+        let width = w as usize;
         Self {
             selected: HeaderList(headers.clone()),
             headers: HeaderList(headers),
             lines: Vec::new(),
+            width,
         }
     }
 
@@ -173,25 +177,11 @@ impl TTYGrid {
     }
 
     fn determine_headers(&mut self) -> Result<(), std::io::Error> {
-        let (w, _) = termion::terminal_size()?;
-        let w = w as usize;
-
         let mut len_map = LengthMapper::default();
         let last = len_map.map_lines(self.lines.clone());
 
         eprintln!("{:?}", len_map);
-        eprintln!("w: {}, last: {}", w, last);
-
-        if last <= w {
-            eprintln!("select all");
-            self.select_all_headers();
-            return Ok(());
-        }
-
-        eprintln!("priority select");
-
-        let mut prio_map: Vec<(usize, (HeaderList, usize))> = Vec::new();
-        self.deselect_all_headers();
+        eprintln!("w: {}, last: {}", self.width, last);
 
         let mut cached_columns = Vec::new();
 
@@ -212,6 +202,17 @@ impl TTYGrid {
             }
         }
 
+        if last <= self.width {
+            eprintln!("select all");
+            self.select_all_headers();
+            return Ok(());
+        }
+
+        eprintln!("priority select");
+
+        let mut prio_map: Vec<(usize, (HeaderList, usize))> = Vec::new();
+        self.deselect_all_headers();
+
         let mut len = self.headers.0.len();
 
         while len > 0 {
@@ -223,7 +224,7 @@ impl TTYGrid {
             eprintln!("headers: {:?}, len: {}", headers.0, headers.0.len());
             let mut max_len = len_map.max_len_for_headers(headers.clone());
 
-            while max_len > w {
+            while max_len > self.width {
                 let mut new_headers = headers.clone();
                 let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
@@ -271,7 +272,7 @@ impl TTYGrid {
         let mut last_len = 0;
 
         for (_, (headers, max_len)) in prio_map.iter().rev() {
-            if *max_len <= w && *max_len > last_len {
+            if *max_len <= self.width && *max_len > last_len {
                 max_headers = Some(headers.clone());
                 last_len = *max_len;
             }
@@ -311,6 +312,7 @@ impl TTYGrid {
 impl fmt::Display for TTYGrid {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "{}", self.selected)?;
+        writeln!(formatter, "{:-<width$}", "-", width = self.width)?;
 
         for line in self.lines.clone() {
             writeln!(formatter, "{}", line.selected(self))?
@@ -416,10 +418,10 @@ impl LengthMapper {
             .iter()
             .map(|line| {
                 line.iter()
-                    .filter_map(|(header, len)| {
+                    .filter_map(|(header, _)| {
                         // wtf is my life anyway
                         if headers.0.contains(header) {
-                            Some((header, len))
+                            Some((header, header.borrow().max_len.unwrap()))
                         } else {
                             None
                         }

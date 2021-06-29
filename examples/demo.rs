@@ -21,20 +21,22 @@ fn randstring(len: u8) -> String {
 
 fn main() -> Result<(), std::io::Error> {
     let header_lineno = Rc::new(RefCell::new(
-        GridHeader::default().set_text("line").set_priority(10),
+        GridHeader::default().set_text("line").set_priority(0),
     ));
     let header_one = Rc::new(RefCell::new(
-        GridHeader::default().set_text("one").set_priority(5),
+        GridHeader::default().set_text("one").set_priority(1),
     ));
     let header_two = Rc::new(RefCell::new(
-        GridHeader::default().set_text("two").set_priority(5),
+        GridHeader::default().set_text("two").set_priority(2),
     ));
     let header_extra = Rc::new(RefCell::new(
-        GridHeader::default().set_text("extra").set_priority(20),
+        GridHeader::default().set_text("extra").set_priority(3),
     ));
-    let header_extra2 = Rc::new(RefCell::new(GridHeader::default().set_text("extra2")));
+    let header_extra2 = Rc::new(RefCell::new(
+        GridHeader::default().set_text("extra2").set_priority(4),
+    ));
     let header_extra3 = Rc::new(RefCell::new(
-        GridHeader::default().set_text("extra3").set_priority(20),
+        GridHeader::default().set_text("extra3").set_priority(5),
     ));
     let mut grid = TTYGrid::new(vec![
         header_lineno.clone(),
