@@ -1,8 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ttygrid::{GridHeader, TTYGrid};
-use ttygrid::{GridItem, GridLine};
+use ttygrid::{GridHeader, GridItem, GridLine, TTYGrid};
 
 fn randstring(len: u8) -> String {
     (0..len)
@@ -13,8 +12,8 @@ fn randstring(len: u8) -> String {
             } else {
                 c as char
             }
+            .to_string()
         })
-        .map(|c| c.to_string())
         .collect::<Vec<String>>()
         .join("")
 }
