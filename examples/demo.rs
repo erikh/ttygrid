@@ -1,0 +1,52 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use ttygrid::{GridHeader, TTYGrid};
+use ttygrid::{GridItem, GridLine};
+
+fn randstring(len: u8) -> String {
+    (0..len)
+        .map(|_| (rand::random::<u8>() % 26) + 'a' as u8)
+        .map(|c| {
+            if rand::random::<bool>() {
+                (c as char).to_ascii_uppercase()
+            } else {
+                c as char
+            }
+        })
+        .map(|c| c.to_string())
+        .collect::<Vec<String>>()
+        .join("")
+}
+
+fn main() -> Result<(), std::io::Error> {
+    let header_lineno = Rc::new(RefCell::new(GridHeader::default().set_text("line")));
+    let header_one = Rc::new(RefCell::new(GridHeader::default().set_text("one")));
+    let header_two = Rc::new(RefCell::new(GridHeader::default().set_text("two")));
+    let header_extra = Rc::new(RefCell::new(GridHeader::default().set_text("extra")));
+    let header_extra2 = Rc::new(RefCell::new(GridHeader::default().set_text("extra2")));
+    let header_extra3 = Rc::new(RefCell::new(
+        GridHeader::default().set_text("extra3").set_priority(20),
+    ));
+    let mut grid = TTYGrid::new(vec![
+        header_lineno.clone(),
+        header_one.clone(),
+        header_two.clone(),
+        header_extra.clone(),
+        header_extra2.clone(),
+        header_extra3.clone(),
+    ]);
+
+    for lineno in 0..10 {
+        grid.add_line(GridLine(vec![
+            GridItem::new(header_lineno.clone(), format!("{}", lineno)),
+            GridItem::new(header_one.clone(), format!("{}", randstring(30))),
+            GridItem::new(header_two.clone(), format!("{}", randstring(30))),
+            GridItem::new(header_extra.clone(), format!("{}", randstring(30))),
+            GridItem::new(header_extra2.clone(), format!("{}", randstring(30))),
+            GridItem::new(header_extra3.clone(), format!("{}", randstring(30))),
+        ]));
+    }
+    println!("{}", grid.display()?);
+    Ok(())
+}
