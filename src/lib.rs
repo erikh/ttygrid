@@ -250,16 +250,16 @@ impl TTYGrid {
             len -= 1;
         }
 
-        prio_map.sort_by(|(lprio, (_, llen)), (rprio, (_, rlen))| {
-            lprio.cmp(&rprio).then(llen.cmp(rlen))
-        });
-
         if prio_map.len() == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "your terminal is too small",
             ));
         }
+
+        prio_map.sort_by(|(lprio, (_, llen)), (rprio, (_, rlen))| {
+            lprio.cmp(&rprio).then(llen.cmp(rlen))
+        });
 
         let (_, (max_headers, _)) = prio_map.iter().last().unwrap();
 
