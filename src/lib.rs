@@ -155,7 +155,7 @@ impl TTYGrid {
 
     pub fn select(&mut self, header: SafeGridHeader, idx: usize) {
         // update index (still an issue)
-        RefCell::borrow_mut(&header).set_index(idx);
+        header.borrow_mut().set_index(idx);
         self.selected.0.push(header)
     }
 
@@ -176,13 +176,7 @@ impl TTYGrid {
         self.selected.0.clear()
     }
 
-    fn determine_headers(&mut self) -> Result<(), std::io::Error> {
-        let mut len_map = LengthMapper::default();
-        let last = len_map.map_lines(self.lines.clone());
-
-        eprintln!("{:?}", len_map);
-        eprintln!("w: {}, last: {}", self.width, last);
-
+    fn set_grid_max_len(&mut self, len_map: &LengthMapper) {
         let mut cached_columns = Vec::new();
 
         let mut idx = 0;
@@ -201,14 +195,18 @@ impl TTYGrid {
                 idx += 1;
             }
         }
+    }
+
+    fn determine_headers(&mut self) -> Result<(), std::io::Error> {
+        let mut len_map = LengthMapper::default();
+        let last = len_map.map_lines(self.lines.clone());
+
+        self.set_grid_max_len(&len_map); // this has to happen before any return occurs
 
         if last <= self.width {
-            eprintln!("select all");
             self.select_all_headers();
             return Ok(());
         }
-
-        eprintln!("priority select");
 
         let mut prio_map: Vec<(usize, (HeaderList, usize))> = Vec::new();
         self.deselect_all_headers();
@@ -221,46 +219,42 @@ impl TTYGrid {
                 headers.0.push(header.clone())
             }
 
-            eprintln!("headers: {:?}, len: {}", headers.0, headers.0.len());
             let mut max_len = len_map.max_len_for_headers(headers.clone());
+            eprintln!("{}", max_len);
 
             while max_len > self.width {
                 let mut new_headers = headers.clone();
                 let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
-                let mut idx = new_headers.0.len();
+                let mut idx = 0;
 
-                for header in new_headers.0.iter().rev() {
-                    idx -= 1;
+                for header in new_headers.0.iter() {
                     let priority = header.borrow().priority;
-                    // we expect that the users will let stuff fall off to the right, so here we
-                    // are optimizing for that WRT priority
                     if priority < lowest_prio_index {
-                        eprintln!("priority: {}", priority);
+                        eprintln!(
+                            "marking for removal: {}, text: {}",
+                            idx,
+                            header.borrow().text
+                        );
                         to_remove = Some(idx);
                         lowest_prio_index = priority;
                     }
-
-                    eprintln!("idx: {}", idx);
+                    idx += 1;
                 }
 
                 if to_remove.is_some() {
-                    eprintln!(
-                        "removing: {}, name: {}",
-                        to_remove.unwrap(),
-                        new_headers.0.get(to_remove.unwrap()).unwrap().borrow().text
-                    );
                     new_headers.0.remove(to_remove.unwrap());
                     max_len = len_map.max_len_for_headers(new_headers.clone());
+                    eprintln!("max len: {}", max_len);
                     headers = new_headers;
                 } else {
-                    break;
+                    max_len = 0 // bury it
                 }
             }
 
             let index = headers.0.iter().fold(0, |acc, x| acc + x.borrow().priority);
             prio_map.push((index, (headers, max_len)));
-
+            eprintln!("pushing to prio map: prio: {}, len: {}", index, max_len);
             len -= 1;
         }
 
@@ -268,37 +262,20 @@ impl TTYGrid {
             lprio.cmp(&rprio).then(llen.cmp(rlen))
         });
 
-        let mut max_headers: Option<HeaderList> = None;
-        let mut last_len = 0;
-
-        for (_, (headers, max_len)) in prio_map.iter().rev() {
-            if *max_len <= self.width && *max_len > last_len {
-                max_headers = Some(headers.clone());
-                last_len = *max_len;
-            }
-        }
-
-        if max_headers.is_none() {
+        if prio_map.len() == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "your terminal is too small",
             ));
         }
 
+        let (_, (max_headers, _)) = prio_map.iter().last().unwrap();
+
         let mut idx = 0;
-        for header in max_headers.unwrap().0 {
-            self.select(header, idx);
+        for header in max_headers.0.iter() {
+            self.select(header.clone(), idx);
             idx += 1;
         }
-
-        eprintln!(
-            "selected {:?}",
-            self.selected
-                .0
-                .iter()
-                .map(|h| RefCell::borrow(h).text)
-                .collect::<Vec<&str>>()
-        );
 
         Ok(())
     }
@@ -335,7 +312,6 @@ impl GridLine {
     fn selected(&self, grid: &TTYGrid) -> Self {
         let mut ret = Vec::new();
         for item in self.0.iter() {
-            eprintln!("{} checked", RefCell::borrow(&item.header).text);
             if grid.is_selected(item.header.clone()) {
                 ret.push(item.clone())
             }
@@ -396,9 +372,7 @@ impl LengthMapper {
     fn max_len_for_column(&self, header: SafeGridHeader) -> usize {
         let mut max_len = 0;
         for line in self.0.clone() {
-            let found = line
-                .iter()
-                .find(|i| RefCell::borrow(&i.0).eq(&header.borrow()));
+            let found = line.iter().find(|i| i.0.borrow().eq(&header.borrow()));
 
             if found.is_none() {
                 // FIXME make this Result<>
@@ -414,21 +388,9 @@ impl LengthMapper {
     }
 
     fn max_len_for_headers(&mut self, headers: HeaderList) -> usize {
-        self.0
+        headers
+            .0
             .iter()
-            .map(|line| {
-                line.iter()
-                    .filter_map(|(header, _)| {
-                        // wtf is my life anyway
-                        if headers.0.contains(header) {
-                            Some((header, header.borrow().max_len.unwrap()))
-                        } else {
-                            None
-                        }
-                    })
-                    .fold(0, |acc, (_, x)| acc + x)
-            })
-            .max()
-            .unwrap()
+            .fold(0, |x, h| x + self.max_len_for_column(h.clone()))
     }
 }
