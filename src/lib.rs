@@ -2,8 +2,9 @@ use anyhow::anyhow;
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 pub mod macros;
+pub use macros::*;
 
-type SafeGridHeader = Rc<RefCell<GridHeader>>;
+pub type SafeGridHeader = Rc<RefCell<GridHeader>>;
 
 #[derive(Clone)]
 pub struct HeaderList(Vec<SafeGridHeader>);
@@ -99,6 +100,14 @@ impl GridHeader {
 
     pub fn set_index(&mut self, idx: usize) {
         self.index = Some(idx);
+    }
+
+    pub fn text(&self) -> &str {
+        self.text.clone()
+    }
+
+    pub fn priority(&self) -> usize {
+        self.priority
     }
 }
 

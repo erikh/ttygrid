@@ -1,3 +1,21 @@
+/// grid defines a [TTYGrid](crate::TTYGrid) full of headers, which are associated with lines.
+///
+/// Each header is typically defined by the [header] macro, and [add_line] is used to add content to
+/// the grid.
+///
+/// Example:
+/// ```
+///    use ttygrid::{grid, add_line, header};
+///    let mut grid = grid!(
+///        header!("line"),     header!("one", 1),  header!("two", 2),
+///        header!("three", 3), header!("four", 4), header!("five", 5)
+///    );
+///
+///    add_line!(grid, "0", "1", "2", "3", "4", "5");
+///
+///    println!("{}", grid.display().unwrap());
+/// ```
+///
 #[macro_export]
 macro_rules! grid {
     ($($header:expr),*) => {
@@ -8,6 +26,23 @@ macro_rules! grid {
     };
 }
 
+/// header defines a [SafeGridHeader](crate::SafeGridHeader) for use with the
+/// [TTYGrid](crate::TTYGrid). It is variadic and composes of two current options:
+///
+/// - text by itself as the first position will yield a base header with the text set.
+/// - a second parameter, optionally provided, will set the priority to a [usize].
+///
+/// Examples:
+///
+/// ```
+///    use ttygrid::header;
+///
+///    assert_eq!(header!("header").borrow().text(), "header");
+///
+///    let priority_header = header!("header2", 10);
+///    assert_eq!(priority_header.borrow().text(), "header2");
+///    assert_eq!(priority_header.borrow().priority(), 10);
+/// ```
 #[macro_export]
 macro_rules! header {
     ($text:literal) => {{
@@ -29,6 +64,11 @@ macro_rules! header {
     }};
 }
 
+/// add_line defines a [GridLine](crate::GridLine) with [GridItem](crate::GridItem)s attached. The
+/// first element provided is the grid; and the rest are strings which correspond to headers set to
+/// the grid, in order of appearance.
+///
+/// Please see the [grid](crate::grid) example for more.
 #[macro_export]
 macro_rules! add_line {
     ($grid:expr, $($content:expr),*) => {
