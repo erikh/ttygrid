@@ -1,7 +1,20 @@
+//! [ttygrid](crate) provides functionality for displaying table-ized text to users with appropriate
+//! padding and width management. With ttygrid, you merely need to feed it your data, some
+//! information about it, and it will automatically determine what to show to the user based on the
+//! available display width.
+//!
+//! It is not intended for streaming (aka, not tty) situations. It probably only works on unix
+//! right now too.
+//!
+//! The [`demo example`]
+//! some basic capabilities and should be reviewed for understanding this library; as well as
+//! learning the macros.
+//!
+//! [`demo example`]: https://github.com/erikh/ttygrid/blob/main/examples/demo.rs
 use anyhow::anyhow;
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
-pub mod macros;
+mod macros;
 pub use macros::*;
 
 pub type SafeGridHeader = Rc<RefCell<GridHeader>>;

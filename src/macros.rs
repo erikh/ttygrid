@@ -27,7 +27,9 @@ macro_rules! grid {
 }
 
 /// header defines a [SafeGridHeader](crate::SafeGridHeader) for use with the
-/// [TTYGrid](crate::TTYGrid). It is variadic and composes of two current options:
+/// [TTYGrid](crate::TTYGrid).
+///
+/// It is variadic and composes of two current options:
 ///
 /// - text by itself as the first position will yield a base header with the text set.
 /// - a second parameter, optionally provided, will set the priority to a [usize].
@@ -64,9 +66,10 @@ macro_rules! header {
     }};
 }
 
-/// add_line defines a [GridLine](crate::GridLine) with [GridItem](crate::GridItem)s attached. The
-/// first element provided is the grid; and the rest are strings which correspond to headers set to
-/// the grid, in order of appearance.
+/// add_line defines a [GridLine](crate::GridLine) with [GridItem](crate::GridItem)s attached.
+///
+/// The first element provided is the grid; and the rest are strings which correspond to headers
+/// set to the grid, in order of appearance.
 ///
 /// Please see the [grid](crate::grid) example for more.
 #[macro_export]
@@ -80,7 +83,10 @@ macro_rules! add_line {
             if content.len() != $grid.headers().len() {
                 Err(anyhow!("ttygrid panic: content items must equal the number of headers"))
             } else {
-                $grid.add_line(GridLine(content.iter().enumerate().map(|(i, item)| GridItem::new($grid.headers().get(i).unwrap().clone(), item.to_string())).collect()));
+                $grid.add_line(GridLine(content.iter().enumerate().map(|(i, item)| {
+                    GridItem::new($grid.headers().get(i).unwrap().clone(), item.to_string())
+                }).collect()));
+
                 Ok(())
             }
         }
