@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
+pub mod macros;
+
 type SafeGridHeader = Rc<RefCell<GridHeader>>;
 
 #[derive(Clone)]
@@ -15,6 +17,14 @@ impl Default for HeaderList {
 impl HeaderList {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&SafeGridHeader> {
+        self.0.get(idx)
     }
 }
 
@@ -155,6 +165,10 @@ impl TTYGrid {
 
     pub fn clear_lines(&mut self) {
         self.lines.clear()
+    }
+
+    pub fn headers(&self) -> HeaderList {
+        self.headers.clone()
     }
 
     pub fn select(&mut self, header: SafeGridHeader, idx: usize) {

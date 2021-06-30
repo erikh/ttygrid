@@ -1,12 +1,14 @@
-use std::cell::RefCell;
-use std::env::args;
-use std::rc::Rc;
-
+// demo program with tweakable args. This program creates a number of static columns, binds data of
+// configurable and random lengths to the columns, and then attempts output. Based on your terminal
+// width, you will see more or less data. Play with the options; they are these constants by
+// default and supplied in order on the CLI.
 const DEFAULT_MAX_LEN: u8 = 30;
 const DEFAULT_MIN_LEN: u8 = 10;
 const DEFAULT_ROWS: usize = 10;
 
-use ttygrid::{GridHeader, GridItem, GridLine, TTYGrid};
+use std::env::args;
+
+use ttygrid::{add_line, grid, header};
 
 // this is a handy random string generator I use in a few spots.
 fn randstring(len: u8) -> String {
@@ -22,6 +24,11 @@ fn randstring(len: u8) -> String {
         })
         .collect::<Vec<String>>()
         .join("")
+}
+
+// small func to min/max random strings
+fn rando(max_len: u8, min_len: u8) -> String {
+    format!("{}", randstring(rand::random::<u8>() % max_len + min_len))
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -51,7 +58,8 @@ fn main() -> Result<(), anyhow::Error> {
         .unwrap_or(DEFAULT_ROWS);
 
     // establish the headers, which we will use to bind tabular data to later. Each header has a
-    // few properties:
+    // few properties (listed in order in the header!() macro, or use GridHeader directly with a
+    // rust builder pattern):
     //
     // - text: this is the display text in the header. Header text is also used to manage column
     //   widths / padding
@@ -62,73 +70,43 @@ fn main() -> Result<(), anyhow::Error> {
     // - max_pad: the padding value to apply when calculating line lengths. This is always greater
     //   than 2, even for zero-length strings.
     //
-    // The whole thing uses the rust "builder" pattern where you compose your parameters by calling
-    // set functions on a chainable object. The result after all the function calls is what is
-    // used.
-    let header_lineno = Rc::new(RefCell::new(
-        GridHeader::default().set_text("line").set_priority(0),
-    ));
-    let header_one = Rc::new(RefCell::new(
-        GridHeader::default().set_text("one").set_priority(1),
-    ));
-    let header_two = Rc::new(RefCell::new(
-        GridHeader::default().set_text("two").set_priority(2),
-    ));
-    let header_three = Rc::new(RefCell::new(
-        GridHeader::default().set_text("three").set_priority(3),
-    ));
-    let header_four = Rc::new(RefCell::new(
-        GridHeader::default().set_text("four").set_priority(4),
-    ));
-    let header_five = Rc::new(RefCell::new(
-        GridHeader::default().set_text("five").set_priority(5),
-    ));
-    let mut grid = TTYGrid::new(vec![
-        header_lineno.clone(),
-        header_one.clone(),
-        header_two.clone(),
-        header_three.clone(),
-        header_four.clone(),
-        header_five.clone(),
-    ]);
+    let header_lineno = header!("line");
+    let header_one = header!("one", 1);
+    let header_two = header!("two", 2);
+    let header_three = header!("three", 3);
+    let header_four = header!("four", 4);
+    let header_five = header!("five", 5);
 
-    // for each line, associate data with each header in a GridLine vector; this data must include
-    // the header and the content. Headers *must* be the above composed objects; they cannot be
-    // re-composed. Soon, macros will help ferry this process along.
+    let mut g = grid!(
+        header_lineno,
+        header_one,
+        header_two,
+        header_three,
+        header_four,
+        header_five
+    );
+
+    // the add_line! macro lines up your content to the position in the grid. the rando() function
+    // here just generates a random string.
     for lineno in 0..rows {
-        grid.add_line(GridLine(vec![
-            GridItem::new(header_lineno.clone(), format!("{}", lineno)),
-            GridItem::new(
-                header_one.clone(),
-                format!("{}", randstring(rand::random::<u8>() % max_len + min_len)),
-            ),
-            GridItem::new(
-                header_two.clone(),
-                format!("{}", randstring(rand::random::<u8>() % max_len + min_len)),
-            ),
-            GridItem::new(
-                header_three.clone(),
-                format!("{}", randstring(rand::random::<u8>() % max_len + min_len)),
-            ),
-            GridItem::new(
-                header_four.clone(),
-                format!("{}", randstring(rand::random::<u8>() % max_len + min_len)),
-            ),
-            GridItem::new(
-                header_five.clone(),
-                format!("{}", randstring(rand::random::<u8>() % max_len + min_len)),
-            ),
-        ]));
+        add_line!(
+            g,
+            format!("{}", lineno),
+            rando(max_len, min_len),
+            rando(max_len, min_len),
+            rando(max_len, min_len),
+            rando(max_len, min_len),
+            rando(max_len, min_len)
+        )?
     }
 
     // finally, display the content. This is the expensive part as calculation is done, a string is
     // generated to memory, and then output.
     //
-    // You might be asking yourself why we don't write to the FD/etc directly, to which I say it's
-    // easier to test a string, and that nobody wants 10000 lines of tabular data sized for a
-    // tty-only scenario. All that said, the algorithm is a big-O nightmare but the results are
-    // fairly good.
+    // You might be asking yourself why we don't write to the FD/etc directly; it's easier to test
+    // a string, and that nobody wants 10000 lines of tabular data sized for a tty-only scenario.
+    // All that said, the algorithm is a big-O nightmare but the results are fairly good.
 
-    println!("{}", grid.display()?);
+    println!("{}", g.display()?);
     Ok(())
 }
