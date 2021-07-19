@@ -44,6 +44,10 @@ macro_rules! grid {
 ///    let priority_header = header!("header2", 10);
 ///    assert_eq!(priority_header.borrow().text(), "header2");
 ///    assert_eq!(priority_header.borrow().priority(), 10);
+///
+///    let name = "foo";
+///    let priority = 20;
+///    assert_eq!(header!(name, priority), header!("foo", 20));
 /// ```
 #[macro_export]
 macro_rules! header {
