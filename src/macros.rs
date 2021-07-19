@@ -47,14 +47,14 @@ macro_rules! grid {
 /// ```
 #[macro_export]
 macro_rules! header {
-    ($text:literal) => {{
+    ($text:tt) => {{
         use std::cell::RefCell;
         use std::rc::Rc;
         use $crate::GridHeader;
         Rc::new(RefCell::new(GridHeader::default().set_text($text)))
     }};
 
-    ($text:literal,$priority:literal) => {{
+    ($text:tt,$priority:tt) => {{
         use std::cell::RefCell;
         use std::rc::Rc;
         use $crate::GridHeader;
