@@ -19,7 +19,7 @@ pub use macros::*;
 
 pub type SafeGridHeader = Rc<RefCell<GridHeader>>;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct HeaderList(Vec<SafeGridHeader>);
 
 impl Default for HeaderList {
@@ -293,9 +293,7 @@ impl TTYGrid {
             return Err(anyhow!("your terminal is too small"));
         }
 
-        prio_map.sort_by(|(lprio, (_, llen)), (rprio, (_, rlen))| {
-            lprio.cmp(&rprio).then(llen.cmp(rlen))
-        });
+        prio_map.sort();
 
         let (_, (max_headers, _)) = prio_map.iter().last().unwrap();
 
