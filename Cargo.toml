@@ -1,6 +1,6 @@
 [package]
 name = "ttygrid"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Erik Hollensbe <erik.hollensbe@zerotier.com>", "Adam Ierymenko <adam.ierymenko@zerotier.com>"]
 edition = "2018"
 license = "BSD-3-Clause"
