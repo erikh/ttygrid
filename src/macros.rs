@@ -11,7 +11,7 @@
 ///    let mut grid = grid!(
 ///        header!("line"),     header!("one", 1),  header!("two", 2),
 ///        header!("three", 3), header!("four", 4), header!("five", 5)
-///    );
+///    ).unwrap();
 ///
 ///    add_line!(grid, "0", "1", "2", "3", "4", "5");
 ///
