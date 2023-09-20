@@ -12,6 +12,10 @@
 //!
 //! [`demo example`]: https://github.com/erikh/ttygrid/blob/main/examples/demo.rs
 use anyhow::{anyhow, Result};
+use crossterm::{
+    execute,
+    style::{Color, Colors, Print, SetColors},
+};
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 mod macros;
@@ -176,6 +180,10 @@ pub struct TTYGrid {
     selected: HeaderList,
     lines: Vec<GridLine>,
     width: usize,
+    header_color: Colors,
+    delimiter_color: Colors,
+    primary_color: Colors,
+    secondary_color: Colors,
 }
 
 impl TTYGrid {
@@ -188,7 +196,27 @@ impl TTYGrid {
             headers: HeaderList(headers),
             lines: Vec::new(),
             width,
+            header_color: Colors::new(Color::Reset, Color::Reset),
+            delimiter_color: Colors::new(Color::Reset, Color::Reset),
+            primary_color: Colors::new(Color::Reset, Color::Reset),
+            secondary_color: Colors::new(Color::Reset, Color::Reset),
         })
+    }
+
+    pub fn set_delimiter_color(&mut self, colors: Colors) {
+        self.delimiter_color = colors
+    }
+
+    pub fn set_header_color(&mut self, colors: Colors) {
+        self.header_color = colors
+    }
+
+    pub fn set_primary_color(&mut self, colors: Colors) {
+        self.primary_color = colors
+    }
+
+    pub fn set_secondary_color(&mut self, colors: Colors) {
+        self.secondary_color = colors
     }
 
     pub fn add_line(&mut self, item: GridLine) {
@@ -311,6 +339,31 @@ impl TTYGrid {
     pub fn display(&mut self) -> Result<String> {
         self.determine_headers()?;
         Ok(format!("{}", self))
+    }
+
+    pub fn write(&mut self, mut writer: impl std::io::Write) -> Result<()> {
+        self.determine_headers()?;
+        execute!(
+            writer,
+            SetColors(self.header_color),
+            Print(&format!("{}\n", self.selected))
+        )?;
+        execute!(
+            writer,
+            SetColors(self.delimiter_color),
+            Print(&format!("{:-<width$}\n", "-", width = self.width))
+        )?;
+
+        for (idx, line) in self.lines.iter().enumerate() {
+            if idx % 2 == 0 {
+                execute!(writer, SetColors(self.primary_color))?;
+            } else {
+                execute!(writer, SetColors(self.secondary_color))?;
+            }
+            execute!(writer, Print(&format!("{}\n", line.selected(self))))?;
+        }
+
+        Ok(())
     }
 }
 

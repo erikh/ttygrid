@@ -8,6 +8,7 @@ const DEFAULT_ROWS: usize = 10;
 
 use std::env::args;
 
+use crossterm::style::{Color, Colors};
 use ttygrid::{add_line, grid, header};
 
 // this is a handy random string generator I use in a few spots.
@@ -100,13 +101,14 @@ fn main() -> Result<(), anyhow::Error> {
         )?
     }
 
-    // finally, display the content. This is the expensive part as calculation is done, a string is
-    // generated to memory, and then output.
-    //
-    // You might be asking yourself why we don't write to the FD/etc directly; it's easier to test
-    // a string, and that nobody wants 10000 lines of tabular data sized for a tty-only scenario.
-    // All that said, the algorithm is a big-O nightmare but the results are fairly good.
+    // spice it up with some colors. New in v0.3.0! You must use the write() API to get this
+    // functionality.
+    g.set_header_color(Colors::new(Color::DarkCyan, Color::Reset));
+    g.set_delimiter_color(Colors::new(Color::Cyan, Color::Reset));
+    g.set_primary_color(Colors::new(Color::White, Color::Reset));
+    g.set_secondary_color(Colors::new(Color::Grey, Color::Reset));
 
-    println!("{}", g.display()?);
+    // finally, display the content.
+    g.write(&mut std::io::stdout())?;
     Ok(())
 }
