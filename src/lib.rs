@@ -4,6 +4,8 @@
 //! automatically determine what to show to the user based on the available display width. See
 //! [crate::grid!] for more information.
 //!
+//! [Here](https://asciinema.org/a/609115) is a demo to see the results in action.
+//!
 //! It is not intended for streaming (aka, not tty) situations. It probably only works on unix
 //! right now too.
 //!
