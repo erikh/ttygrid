@@ -11,7 +11,7 @@
 //! learning the macros.
 //!
 //! [`demo example`]: https://github.com/erikh/ttygrid/blob/main/examples/demo.rs
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use std::{cell::RefCell, fmt, rc::Rc, usize::MAX};
 
 mod macros;
@@ -169,16 +169,16 @@ pub struct TTYGrid {
 }
 
 impl TTYGrid {
-    pub fn new(headers: Vec<SafeGridHeader>) -> Self {
-        let (w, _) = termion::terminal_size().unwrap_or((80, 25));
+    pub fn new(headers: Vec<SafeGridHeader>) -> Result<Self> {
+        let (w, _) = crossterm::terminal::size()?;
         let width = w as usize;
 
-        Self {
+        Ok(Self {
             selected: HeaderList::new(),
             headers: HeaderList(headers),
             lines: Vec::new(),
             width,
-        }
+        })
     }
 
     pub fn add_line(&mut self, item: GridLine) {

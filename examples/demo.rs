@@ -84,7 +84,7 @@ fn main() -> Result<(), anyhow::Error> {
         header_three,
         header_four,
         header_five
-    );
+    )?;
 
     // the add_line! macro lines up your content to the position in the grid. the rando() function
     // here just generates a random string.
