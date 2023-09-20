@@ -19,18 +19,16 @@ pub use macros::*;
 
 pub type SafeGridHeader = Rc<RefCell<GridHeader>>;
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Default, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct HeaderList(Vec<SafeGridHeader>);
-
-impl Default for HeaderList {
-    fn default() -> Self {
-        Self(Vec::new())
-    }
-}
 
 impl HeaderList {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
     }
 
     pub fn len(&self) -> usize {
@@ -42,7 +40,7 @@ impl HeaderList {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Ord)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct GridHeader {
     index: Option<usize>,
     text: &'static str,
@@ -75,6 +73,18 @@ impl PartialOrd for GridHeader {
             )
         } else {
             Some(self.priority.cmp(&other.priority))
+        }
+    }
+}
+
+impl Ord for GridHeader {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.index.is_some() {
+            self.priority
+                .cmp(&other.priority)
+                .then(self.index.cmp(&other.index))
+        } else {
+            self.priority.cmp(&other.priority)
         }
     }
 }
@@ -124,7 +134,7 @@ impl GridHeader {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct GridItem {
     header: SafeGridHeader,
     contents: String,
@@ -214,21 +224,17 @@ impl TTYGrid {
     fn set_grid_max_len(&mut self, len_map: &LengthMapper) -> Result<()> {
         let mut cached_columns = Vec::new();
 
-        let mut idx = 0;
-        for header in self.headers.0.iter_mut() {
+        for (idx, header) in self.headers.0.iter_mut().enumerate() {
             let max_len = len_map.max_len_for_column(&header.borrow())?;
             header.borrow_mut().set_max_len(max_len);
             cached_columns.insert(idx, header.borrow().max_len);
-            idx += 1;
         }
 
         for line in self.lines.iter_mut() {
-            let mut idx = 0;
-            for item in line.0.iter_mut() {
-                if cached_columns.get(idx).is_some() {
-                    item.set_max_len(cached_columns.get(idx).clone().unwrap().unwrap());
+            for (idx, item) in line.0.iter_mut().enumerate() {
+                if let Some(column) = cached_columns.get(idx) {
+                    item.set_max_len(column.unwrap());
                 }
-                idx += 1;
             }
         }
 
@@ -264,19 +270,17 @@ impl TTYGrid {
                 let mut new_headers = headers.clone();
                 let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
-                let mut idx = 0;
 
-                for header in new_headers.0.iter() {
+                for (idx, header) in new_headers.0.iter().enumerate() {
                     let priority = header.borrow().priority;
                     if priority < lowest_prio_index {
                         to_remove = Some(idx);
                         lowest_prio_index = priority;
                     }
-                    idx += 1;
                 }
 
-                if to_remove.is_some() {
-                    new_headers.0.remove(to_remove.unwrap());
+                if let Some(to_remove) = to_remove {
+                    new_headers.0.remove(to_remove);
                     max_len = len_map.max_len_for_headers(new_headers.clone())?;
                     headers = new_headers;
                 } else {
@@ -289,7 +293,7 @@ impl TTYGrid {
             len -= 1;
         }
 
-        if prio_map.len() == 0 {
+        if prio_map.is_empty() {
             return Err(anyhow!("your terminal is too small"));
         }
 
@@ -297,10 +301,8 @@ impl TTYGrid {
 
         let (_, (max_headers, _)) = prio_map.iter().last().unwrap();
 
-        let mut idx = 0;
-        for header in max_headers.0.iter() {
+        for (idx, header) in max_headers.0.iter().enumerate() {
             self.select(header.clone(), idx);
-            idx += 1;
         }
 
         Ok(())
@@ -325,7 +327,7 @@ impl fmt::Display for TTYGrid {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct GridLine(pub Vec<GridItem>);
 
 impl GridLine {
@@ -341,12 +343,6 @@ impl GridLine {
     }
 }
 
-impl Default for GridLine {
-    fn default() -> Self {
-        GridLine(Vec::new())
-    }
-}
-
 impl fmt::Display for GridLine {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for contents in self.0.clone() {
@@ -357,14 +353,8 @@ impl fmt::Display for GridLine {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct LengthMapper(Vec<Vec<(SafeGridHeader, usize)>>);
-
-impl Default for LengthMapper {
-    fn default() -> Self {
-        Self(Vec::new())
-    }
-}
 
 impl LengthMapper {
     fn map_lines(&mut self, lines: Vec<GridLine>) {
@@ -383,7 +373,7 @@ impl LengthMapper {
     fn max_len_for_column(&self, header: &GridHeader) -> Result<usize> {
         let mut max_len = 0;
         for line in self.0.clone() {
-            let found = line.iter().find(|i| i.0.borrow().eq(&header));
+            let found = line.iter().find(|i| i.0.borrow().eq(header));
 
             if found.is_none() {
                 return Err(anyhow!(
