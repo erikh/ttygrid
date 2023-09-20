@@ -211,7 +211,7 @@ impl TTYGrid {
         self.selected.0.clear()
     }
 
-    fn set_grid_max_len(&mut self, len_map: &LengthMapper) -> Result<(), anyhow::Error> {
+    fn set_grid_max_len(&mut self, len_map: &LengthMapper) -> Result<()> {
         let mut cached_columns = Vec::new();
 
         let mut idx = 0;
@@ -235,7 +235,7 @@ impl TTYGrid {
         Ok(())
     }
 
-    fn determine_headers(&mut self) -> Result<(), anyhow::Error> {
+    fn determine_headers(&mut self) -> Result<()> {
         let mut len_map = LengthMapper::default();
         len_map.map_lines(self.lines.clone());
 
@@ -306,7 +306,7 @@ impl TTYGrid {
         Ok(())
     }
 
-    pub fn display(&mut self) -> Result<String, anyhow::Error> {
+    pub fn display(&mut self) -> Result<String> {
         self.determine_headers()?;
         Ok(format!("{}", self))
     }
@@ -380,7 +380,7 @@ impl LengthMapper {
         }
     }
 
-    fn max_len_for_column(&self, header: &GridHeader) -> Result<usize, anyhow::Error> {
+    fn max_len_for_column(&self, header: &GridHeader) -> Result<usize> {
         let mut max_len = 0;
         for line in self.0.clone() {
             let found = line.iter().find(|i| i.0.borrow().eq(&header));
@@ -399,7 +399,7 @@ impl LengthMapper {
         Ok(max_len + header.max_pad.unwrap_or(0) + 2)
     }
 
-    fn max_len_for_headers(&mut self, headers: HeaderList) -> Result<usize, anyhow::Error> {
+    fn max_len_for_headers(&mut self, headers: HeaderList) -> Result<usize> {
         Ok(headers.0.iter().fold(0, |x, h| {
             x + self
                 .max_len_for_column(&h.clone().borrow())
