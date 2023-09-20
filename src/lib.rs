@@ -1,7 +1,8 @@
-//! [ttygrid](crate) provides functionality for displaying table-ized text to users with appropriate
-//! padding and width management. With ttygrid, you merely need to feed it your data, some
-//! information about it, and it will automatically determine what to show to the user based on the
-//! available display width.
+//! ttygrid provides functionality for displaying table-ized text to users with
+//! appropriate padding and width management. With ttygrid, you merely need to feed it your data,
+//! some information about the precedence (called a "priority") of each column, and it will
+//! automatically determine what to show to the user based on the available display width. See
+//! [crate::grid!] for more information.
 //!
 //! It is not intended for streaming (aka, not tty) situations. It probably only works on unix
 //! right now too.
@@ -11,6 +12,9 @@
 //! learning the macros.
 //!
 //! [`demo example`]: https://github.com/erikh/ttygrid/blob/main/examples/demo.rs
+//!
+//! Much of this library relies on the macros, not the types directly. Please review those for the
+//! most comprehensive documentation.
 use anyhow::{anyhow, Result};
 use crossterm::{
     execute,
@@ -23,6 +27,8 @@ pub use macros::*;
 
 pub type SafeGridHeader = Rc<RefCell<GridHeader>>;
 
+/// HeaderList defines a list of headers. This is typically composed as a part of the process from
+/// [crate::header!] and [crate::grid!] and is not constructed directly.
 #[derive(Default, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct HeaderList(Vec<SafeGridHeader>);
 
@@ -44,6 +50,27 @@ impl HeaderList {
     }
 }
 
+impl fmt::Display for HeaderList {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for header in self.0.clone() {
+            write!(
+                formatter,
+                "{:<width$}",
+                header.borrow().text,
+                width = header
+                    .borrow()
+                    .max_len
+                    .unwrap_or(header.borrow().text.len() + 2)
+            )?
+        }
+        Ok(())
+    }
+}
+
+/// GridHeader encapsulates the properties of a header, such as priority and padding information.
+/// This is typically constructed by [crate::header!] and is not constructed directly.
+///
+/// Several methods can adjust the content of the header after the fact, and should be reviewed.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct GridHeader {
     index: Option<usize>,
@@ -93,38 +120,26 @@ impl Ord for GridHeader {
     }
 }
 
-impl fmt::Display for HeaderList {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for header in self.0.clone() {
-            write!(
-                formatter,
-                "{:<width$}",
-                header.borrow().text,
-                width = header
-                    .borrow()
-                    .max_len
-                    .unwrap_or(header.borrow().text.len() + 2)
-            )?
-        }
-        Ok(())
-    }
-}
-
 impl GridHeader {
+    /// Set the maximum length of items belonging to this header.
     pub fn set_max_len(&mut self, len: usize) {
         self.max_len = Some(len)
     }
 
+    /// Set the text of this header.
     pub fn set_text(mut self, text: &'static str) -> Self {
         self.text = text;
         self
     }
 
+    /// Set the priority of this header. Higher priority items will be more likely to be shown on
+    /// smaller terminal sizes.
     pub fn set_priority(mut self, priority: usize) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Set the position this header lives within the column list. 0 is the first position.
     pub fn set_index(&mut self, idx: usize) {
         self.index = Some(idx);
     }
@@ -138,6 +153,8 @@ impl GridHeader {
     }
 }
 
+/// GridItem is the encapsulation of a piece of content. It is usually created by invoking
+/// [crate::add_line!] and is not instantiated directly.
 #[derive(Clone, Debug, Default)]
 pub struct GridItem {
     header: SafeGridHeader,
@@ -174,6 +191,9 @@ impl fmt::Display for GridItem {
     }
 }
 
+/// Usually constructed by [crate::grid!], this is the outer object of the whole library, all
+/// things are held by it in some form. Please review the impl for methods which can be used to
+/// adjust the properties of the grid once created.
 #[derive(Clone)]
 pub struct TTYGrid {
     headers: HeaderList,
@@ -203,18 +223,24 @@ impl TTYGrid {
         })
     }
 
+    /// Sets the delimiter color; the dashes between the header and the content.
     pub fn set_delimiter_color(&mut self, colors: Colors) {
         self.delimiter_color = colors
     }
 
+    /// Sets the header color.
     pub fn set_header_color(&mut self, colors: Colors) {
         self.header_color = colors
     }
 
+    /// Sets the primary color; colors will alternate between primary and secondary per row as the
+    /// table is built.
     pub fn set_primary_color(&mut self, colors: Colors) {
         self.primary_color = colors
     }
 
+    /// Sets the secondary color; colors will alternate between primary and secondary per row as
+    /// the table is built.
     pub fn set_secondary_color(&mut self, colors: Colors) {
         self.secondary_color = colors
     }
@@ -336,11 +362,15 @@ impl TTYGrid {
         Ok(())
     }
 
+    /// Yield a string which is suitable for passing to [println!], but does not make any attempt
+    /// to add terminal styling, which may be better for situations where data is piped. Unlike
+    /// [std::fmt::Display], this display method returns `Result<String, anyhow::Error>`.
     pub fn display(&mut self) -> Result<String> {
         self.determine_headers()?;
         Ok(format!("{}", self))
     }
 
+    /// Write to the writer, typically [std::io::stdout]. Terminal colors will be set.
     pub fn write(&mut self, mut writer: impl std::io::Write) -> Result<()> {
         self.determine_headers()?;
         execute!(
@@ -380,6 +410,7 @@ impl fmt::Display for TTYGrid {
     }
 }
 
+/// A collection of grid items. Usually instantiated by [crate::add_line!].
 #[derive(Clone, Default, Debug)]
 pub struct GridLine(pub Vec<GridItem>);
 

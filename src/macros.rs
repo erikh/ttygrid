@@ -1,7 +1,9 @@
-/// grid defines a [TTYGrid](crate::TTYGrid) full of headers, which are associated with lines.
+/// grid defines a [crate::TTYGrid] full of headers, which are associated with lines.
 ///
-/// Each header is typically defined by the [header] macro, and [add_line] is used to add content to
-/// the grid.
+/// Each header is typically defined by the [crate::header!] macro, and [crate::add_line!] is used
+/// to add content to the grid. Headers may have an optional priority; in the case where the line
+/// is too long to be displayed on a terminal of that width, columns with a lower priority will be
+/// removed to help the higher priority items fit.
 ///
 /// Example:
 /// ```
@@ -26,13 +28,14 @@ macro_rules! grid {
     };
 }
 
-/// header defines a [SafeGridHeader](crate::SafeGridHeader) for use with the
-/// [TTYGrid](crate::TTYGrid).
+/// header defines a [crate::SafeGridHeader] for use with the [crate::TTYGrid].
 ///
 /// It is variadic and composes of two current options:
 ///
 /// - text by itself as the first position will yield a base header with the text set.
-/// - a second parameter, optionally provided, will set the priority to a [usize].
+/// - a second parameter, optionally provided, will set the priority to a [usize]. This controls
+///   display capabilities where the terminal width is too small to display all columns. See
+///   [crate::grid!] for more.
 ///
 /// Examples:
 ///
@@ -70,12 +73,13 @@ macro_rules! header {
     }};
 }
 
-/// add_line defines a [GridLine](crate::GridLine) with [GridItem](crate::GridItem)s attached.
+/// add_line defines a [crate::GridLine] with [crate::GridItem]s attached.
 ///
 /// The first element provided is the grid; and the rest are strings which correspond to headers
-/// set to the grid, in order of appearance.
+/// set to the grid, in order of appearance. A line **must** be equal to the number of headers,
+/// otherwise this macro will yield [anyhow::Error].
 ///
-/// Please see the [grid](crate::grid) example for more.
+/// Please see the [crate::grid!] example for more.
 #[macro_export]
 macro_rules! add_line {
     ($grid:expr, $($content:expr),*) => {
