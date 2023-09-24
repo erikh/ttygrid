@@ -324,8 +324,8 @@ impl TTYGrid {
 
             while max_len > self.width {
                 let mut new_headers = headers.clone();
-                let mut lowest_prio_index = MAX;
                 let mut to_remove = None;
+                let mut lowest_prio_index = MAX;
 
                 for (idx, header) in new_headers.0.iter().enumerate() {
                     let priority = header.borrow().priority;

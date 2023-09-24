@@ -72,11 +72,11 @@ fn main() -> Result<(), anyhow::Error> {
     //   than 2, even for zero-length strings.
     //
     let header_lineno = header!("line");
-    let header_one = header!("one", 1);
-    let header_two = header!("two", 2);
-    let header_three = header!("three", 3);
-    let header_four = header!("four", 4);
-    let header_five = header!("five", 5);
+    let header_one = header!("p3", 3);
+    let header_two = header!("p1", 1);
+    let header_three = header!("p4", 4);
+    let header_four = header!("p5", 5);
+    let header_five = header!("p2", 2);
 
     let mut g = grid!(
         header_lineno,
